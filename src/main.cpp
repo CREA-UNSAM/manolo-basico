@@ -41,17 +41,26 @@ const int PINS_DIGITAL_SENSORS[CANT_DIGITAL_SENSORS] = {PIN_SENSOR_0, PIN_SENSOR
 //GLOBAL CONSTANTS
 const int ANALOG_SENSOR_THRESHOLD = 1024;
 const int ANALOG_SENSOR_MAX = 1024;
-const int MOTORS_MAX_PWM_VALUE = 1024;
+const int MOTORS_MAX_PWM_VALUE = 255;
 
 const int DELAY_MS_MAIN_LOOP = 100;
 
 const int CANT_LONGPRESS_LEN = 600 / DELAY_MS_MAIN_LOOP;  // 2.5 seconds
-const int CANT_SHORTPRESS_LEN = 100 / DELAY_MS_MAIN_LOOP;   // 0.1 seconds
+const int CANT_SHORTPRESS_LEN = 100 / DELAY_MS_MAIN_LOOP;   // 0.1 seconds  -- the minimum time to consider a short press
 // const int CANT_WAIT_TO_ACTION_LEN = 200 / DELAY_MS_MAIN_LOOP;   // 0.2 seconds
 
-const int SPEED_BASE = 50;
+const int SPEED_BASE = 80;
 const int SPEED_INCREMENT = 30;
-const int SPEED_INCREMENT_SOFT = 10;
+const int SPEED_INCREMENT_SOFT = 20;
+
+//PISO NEGRO Y LINEA BLANCA
+// const int VALUE_LINE = 1;
+// const int VALUE_NO_LINE = 0;
+
+//PISO BLANCO Y LINEA NEGRA
+const int VALUE_LINE = 0;
+const int VALUE_NO_LINE = 1;
+
 
 //STRUCTURES
 struct MotorsSpeeds {
@@ -171,11 +180,6 @@ void setup() {
   Serial.println("INITIALIZATION COMPLETED");
   applySpeedsToMotors({0,0});
   Serial.println("MOTORES STOPPED");
-  delay(1000);
-  Serial.println("MOTORES START");
-  applySpeedsToMotors({255,255});
-
-
   currentState = STATE_STOP;
 }
 
@@ -202,7 +206,7 @@ void loop() {
       if (event == EV_SHORTPRESS) {
         currentState = STATE_RUNNING;
       } 
-      // applySpeedsToMotors({0,0});
+      applySpeedsToMotors({0,0});
 
       break;
     }
@@ -260,7 +264,7 @@ SensorsData readSensorsValues() {
 
   //----analog to digital conversion
   for (int i = 0; i < CANT_ANALOG_SENSORS; i++) {
-    sensorData.digitalSensorValues[i + 1] = sensorData.analogSensorValues[i] > (ANALOG_SENSOR_THRESHOLD / 2) ? 1 : 0;
+    sensorData.digitalSensorValues[i + 1] = sensorData.analogSensorValues[i] > (ANALOG_SENSOR_THRESHOLD / 2) ? VALUE_LINE : VALUE_NO_LINE;
     }
 
   sensorData.digitalSensorValues[CANT_ALL_SENSORS - 1] = digitalRead(PINS_DIGITAL_SENSORS[1]);
@@ -280,7 +284,7 @@ void printSensorsValues(SensorsData sensorData) {
 
   Serial.print("DV: ");
   for (int i = 0; i < 8; i++) {
-    Serial.print(sensorData.digitalSensorValues[i] == 1 ? " [" + String(i + 1) + "]" : " ___");
+    Serial.print(sensorData.digitalSensorValues[i] == VALUE_LINE ? " [" + String(i + 1) + "]" : " ___");
   }
   Serial.println("");
 
@@ -292,15 +296,15 @@ MotorsSpeeds calculateMotorsSpeeds(SensorsData sensorData) {
   int weights[] = {5, 3, 2, 1, 1, 2, 3, 5};
   
   int maxLeftDetections = 0;
-  for (int i = 0; i < CANT_DIGITAL_SENSORS / 2; i++) {
-    if (sensorData.digitalSensorValues[i] == 1 && weights[i] > maxLeftDetections){
+  for (int i = 0; i < CANT_ALL_SENSORS / 2; i++) {
+    if (sensorData.digitalSensorValues[i] == VALUE_LINE && weights[i] > maxLeftDetections){
       maxLeftDetections = weights[i];
     }
   }
 
   int maxRightDetections = 0;
-  for (int i = CANT_DIGITAL_SENSORS / 2; i < CANT_DIGITAL_SENSORS; i++) {
-    if (sensorData.digitalSensorValues[i] == 1 && weights[i] > maxRightDetections){
+  for (int i = CANT_ALL_SENSORS / 2; i < CANT_ALL_SENSORS; i++) {
+    if (sensorData.digitalSensorValues[i] == VALUE_LINE && weights[i] > maxRightDetections){
       maxRightDetections = weights[i];
     }
   }
@@ -327,39 +331,6 @@ MotorsSpeeds calculateMotorsSpeeds(SensorsData sensorData) {
 }
 
 void printMotorsSpeeds(MotorsSpeeds motorSpeeds) {
-
-int s0 = digitalRead(ir0);  // Left Most Sensor
-  int s1 = digitalRead(ir1);  // Left Sensor
-  int s2 = digitalRead(ir2);  // Left Center Sensor
-  int s3 = digitalRead(ir3);  // Center Left Sensor
-  int s4 = digitalRead(ir4);  // Center Right Sensor
-  int s5 = digitalRead(ir5);  // Right Center Sensor
-  int s6 = digitalRead(ir6);  // Right Sensor
-  int s7 = digitalRead(ir7);  // Right Most Sensor
-
-  //print all values
-  //print all sensor values
-  Serial.print("Sensors: ");
-  Serial.print(s0);
-  Serial.print(" ");
-  Serial.print(s1);
-  Serial.print(" ");
-  Serial.print(s2);
-  Serial.print(" ");
-  Serial.print(s3);
-  Serial.print(" ");
-  Serial.print(s4);
-  Serial.print(" ");
-  Serial.print(s5);
-  Serial.print(" ");
-  Serial.print(s6);
-  Serial.print(" ");
-  Serial.println(s7);
-
-
-
-
-
   //print the motor speeds to the serial monitor
   Serial.print("Calc L = ");
   Serial.print(motorSpeeds.leftSpeed);
@@ -372,8 +343,8 @@ void applySpeedsToMotors(MotorsSpeeds motorSpeeds) {
 
   static int actualLeftPWMSpeed = 0;
   static int actualRightPWMSpeed = 0;
-  static int actualLeftDirection = 0;
-  static int actualRightDirection = 0;
+  static int actualLeftDirection = 1;
+  static int actualRightDirection = 1;
 
   int desiredLeftSpeed = abs(motorSpeeds.leftSpeed);
   int desiredRightSpeed = abs(motorSpeeds.rightSpeed);
@@ -382,39 +353,45 @@ void applySpeedsToMotors(MotorsSpeeds motorSpeeds) {
 
   if(DEBUG == 1){
     //print the desired speeds and directions
+    // Serial.println("<<<<<<<<<<<<< ");
     Serial.print("Desired L = ");
     Serial.print(desiredLeftSpeed);
     Serial.print(" | R = ");
     Serial.println(desiredRightSpeed);
-    Serial.print("Dir L = ");
-    Serial.print(desiredLeftDirection);
-    Serial.print(" | R = ");
-    Serial.println(desiredRightDirection);
+    // Serial.print("Dir L = ");
+    // Serial.print(desiredLeftDirection);
+    // Serial.print(" | R = ");
+    // Serial.println(desiredRightDirection);
 
     //print the actual speeds and directions
+    // Serial.println(">>>>>>> ");
     Serial.print("Actual L = ");
     Serial.print(actualLeftPWMSpeed);
     Serial.print(" | R = ");
     Serial.println(actualRightPWMSpeed);
-    Serial.print("Dir L = ");
-    Serial.print(actualLeftDirection);
-    Serial.print(" | R = ");
-    Serial.println(actualRightDirection);
+    // Serial.print("Dir L = ");
+    // Serial.print(actualLeftDirection);
+    // Serial.print(" | R = ");
+    // Serial.println(actualRightDirection);
   }
   
 
-  // Adjust softly the speed of the motors
-  if (desiredRightSpeed > actualRightPWMSpeed) {
-    actualRightPWMSpeed += SPEED_INCREMENT_SOFT;
-  } else if (desiredRightSpeed < actualRightPWMSpeed) {
-    actualRightPWMSpeed += SPEED_INCREMENT_SOFT;
+  // Adjust softly the speed of the motors until 0 or 255
+  if (actualLeftPWMSpeed >= 0 && actualLeftPWMSpeed <= MOTORS_MAX_PWM_VALUE){    
+    if (desiredLeftSpeed > actualLeftPWMSpeed) {
+      actualLeftPWMSpeed += SPEED_INCREMENT_SOFT;
+    } else if (desiredLeftSpeed < actualLeftPWMSpeed) {
+      actualLeftPWMSpeed -= SPEED_INCREMENT_SOFT;
+    }
   }
 
-  if (desiredLeftSpeed > actualLeftPWMSpeed) {
-    actualLeftPWMSpeed += SPEED_INCREMENT_SOFT;
-  } else if (desiredLeftSpeed < actualLeftPWMSpeed) {
-    actualLeftPWMSpeed += SPEED_INCREMENT_SOFT;
-  }
+  if (actualRightPWMSpeed >= 0 && actualRightPWMSpeed <= MOTORS_MAX_PWM_VALUE){
+    if (desiredRightSpeed > actualRightPWMSpeed) {
+      actualRightPWMSpeed += SPEED_INCREMENT_SOFT;
+    } else if (desiredRightSpeed < actualRightPWMSpeed) {
+      actualRightPWMSpeed -= SPEED_INCREMENT_SOFT;
+    }
+  }  
   
   // Motor izquierdo
   if (actualLeftDirection > 0) {
