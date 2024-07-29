@@ -38,20 +38,19 @@ const int PINS_DIGITAL_SENSORS[CANT_DIGITAL_SENSORS] = {PIN_SENSOR_0, PIN_SENSOR
 
 
 //GLOBAL CONSTANTS
-#define ANALOG_SENSOR_THRESHOLD   1024
-#define ANALOG_SENSOR_MAX         1024
-#define MOTORS_MAX_PWM_VALUE      1024
+const int ANALOG_SENSOR_THRESHOLD = 1024;
+const int ANALOG_SENSOR_MAX = 1024;
+const int MOTORS_MAX_PWM_VALUE = 1024;
 
-#define DELAY_MS_MAIN_LOOP  100
+const int DELAY_MS_MAIN_LOOP = 100;
 
-#define CANT_LONGPRESS_LEN    600 / DELAY_MS_MAIN_LOOP  // 2.5 seconds
-#define CANT_SHORTPRESS_LEN   100 / DELAY_MS_MAIN_LOOP   // 0.1 seconds
-// #define CANT_WAIT_TO_ACTION_LEN   200 / DELAY_MS_MAIN_LOOP   // 0.2 seconds
+const int CANT_LONGPRESS_LEN = 600 / DELAY_MS_MAIN_LOOP;  // 2.5 seconds
+const int CANT_SHORTPRESS_LEN = 100 / DELAY_MS_MAIN_LOOP;   // 0.1 seconds
+// const int CANT_WAIT_TO_ACTION_LEN = 200 / DELAY_MS_MAIN_LOOP;   // 0.2 seconds
 
-#define SPEED_BASE      50
-#define SPEED_INCREMENT      30
-
-
+const int SPEED_BASE = 50;
+const int SPEED_INCREMENT = 30;
+const int SPEED_INCREMENT_SOFT = 10;
 
 //STRUCTURES
 struct MotorsSpeeds {
@@ -180,12 +179,12 @@ void loop() {
   handle_led(currentState);
 
   //print for serial monitor the event
-  if(DEBUG){
-    Serial.print("E: "); // event
+  if(DEBUG == 1){
+    Serial.print("Evn: "); // event
     Serial.print(event);
-    Serial.print(" | B: "); // button
+    Serial.print(" | Btn: "); // button
     Serial.print(digitalRead(PIN_BUTTON));
-    Serial.print(" | S: "); // state
+    Serial.print(" | Sta: "); // state
     Serial.println(currentState);
   }
 
@@ -209,19 +208,19 @@ void loop() {
 
       SensorsData sensorData = readSensorsValues();
       
-      if(DEBUG) {
+      if(DEBUG == 1) {
         printSensorsValues(sensorData);
       } 
     
       MotorsSpeeds motorsSpeeds = calculateMotorsSpeeds(sensorData);
 
-      if(DEBUG) {
+      if(DEBUG == 1) {
         printMotorsSpeeds(motorsSpeeds);
       } 
 
       applySpeedsToMotors(motorsSpeeds);
 
-      // if(DEBUG){
+      // if(DEBUG == 1){
       //   Serial.println("==============================================================");
       // }
 
@@ -232,9 +231,7 @@ void loop() {
     {
       break;
     }
-  
-}
-
+  }
 
   delay(DELAY_MS_MAIN_LOOP);
 }
@@ -242,7 +239,7 @@ void loop() {
 
 SensorsData readSensorsValues() {
 
-  SensorsData sensorData;
+  SensorsData sensorData = {.analogSensorValues = {0, 0, 0, 0, 0, 0}, .digitalSensorValues = {0, 0}};
   
   //analog read
   for (int i = 0; i < CANT_ANALOG_SENSORS; i++) {
@@ -274,70 +271,56 @@ void printSensorsValues(SensorsData sensorData) {
 
   Serial.print("DV: ");
   for (int i = 0; i < 8; i++) {
-    Serial.print(sensorData.digitalSensorValues[i] == 1 ? "[" + String(i) + "]" : " ___");
+    Serial.print(sensorData.digitalSensorValues[i] == 1 ? " [" + String(i + 1) + "]" : " ___");
   }
+  Serial.println("");
+
 }
 
 MotorsSpeeds calculateMotorsSpeeds(SensorsData sensorData) {
 
-  MotorsSpeeds motorsSpeeds; 
+  MotorsSpeeds motorsSpeeds = {.leftSpeed = 0, .rightSpeed = 0}; 
   int weights[] = {5, 3, 2, 1, 1, 2, 3, 5};
   
-  int maxRightDetections = 0;
-  for (int i = CANT_DIGITAL_SENSORS / 2 - 1; i < CANT_DIGITAL_SENSORS; i++) {
-    if (sensorData.digitalSensorValues[i] * weights[i] > maxRightDetections)
-      maxRightDetections = sensorData.digitalSensorValues[i] * weights[i];
-  }
-
   int maxLeftDetections = 0;
   for (int i = 0; i < CANT_DIGITAL_SENSORS / 2; i++) {
-    if (sensorData.digitalSensorValues[i] * weights[i] > maxLeftDetections)
-      maxLeftDetections = sensorData.digitalSensorValues[i] * weights[i];
+    if (sensorData.digitalSensorValues[i] == 1 && weights[i] > maxLeftDetections){
+      maxLeftDetections = weights[i];
+    }
+  }
+
+  int maxRightDetections = 0;
+  for (int i = CANT_DIGITAL_SENSORS / 2; i < CANT_DIGITAL_SENSORS; i++) {
+    if (sensorData.digitalSensorValues[i] == 1 && weights[i] > maxRightDetections){
+      maxRightDetections = weights[i];
+    }
   }
   
   //El output va a ir tomando valores positivos y negativos 
   motorsSpeeds.leftSpeed = SPEED_BASE + SPEED_INCREMENT * maxRightDetections; // Motor izquierdo + Error derecho
   motorsSpeeds.rightSpeed = SPEED_BASE + SPEED_INCREMENT * maxLeftDetections; // Motor derecho + Error izquierdo
 
+  Serial.print("NCons L = ");
+  Serial.print(motorsSpeeds.leftSpeed);
+  Serial.print(" | R = ");
+  Serial.println(motorsSpeeds.rightSpeed);
+
   // Asegurarse de que las velocidades no excedan los límites
-  motorsSpeeds.leftSpeed = constrain(motorsSpeeds.leftSpeed, -MOTORS_MAX_PWM_VALUE, MOTORS_MAX_PWM_VALUE);
-  motorsSpeeds.rightSpeed = constrain(motorsSpeeds.rightSpeed, -MOTORS_MAX_PWM_VALUE, MOTORS_MAX_PWM_VALUE);
+  motorsSpeeds.leftSpeed = constrain(motorsSpeeds.leftSpeed, 0, MOTORS_MAX_PWM_VALUE);
+  motorsSpeeds.rightSpeed = constrain(motorsSpeeds.rightSpeed, 0, MOTORS_MAX_PWM_VALUE);
+
+  Serial.print("WCons L = ");
+  Serial.print(motorsSpeeds.leftSpeed);
+  Serial.print(" | R = ");
+  Serial.println(motorsSpeeds.rightSpeed);
 
   return motorsSpeeds;
 }
 
-// MotorsSpeeds calculateMotorsSpeeds(SensorsData sensorData) {
-
-//   MotorsSpeeds motorsSpeeds;
-  
-//   //calcular el error
-//   int rightDetections = 0;
-//   for (int i = 0; i < CANT_DIGITAL_SENSORS / 2; i++) {
-//     rightDetections += sensorData.digitalSensorValues[i];
-//   }
-
-//   int leftDetections = 0;
-//   for (int i = CANT_DIGITAL_SENSORS / 2; i < CANT_DIGITAL_SENSORS; i++) {
-//     leftDetections += sensorData.digitalSensorValues[i];
-//   }
-
-//   //El output va a ir tomando valores positivos y negativos 
-//   motorsSpeeds.leftSpeed = SPEED_BASE + SPEED_INCREMENT * leftDetections; // Motor izquierdo
-//   motorsSpeeds.rightSpeed = SPEED_BASE + SPEED_INCREMENT * rightDetections; // Motor derecho
-
-//   // Asegurarse de que las velocidades no excedan los límites
-//   motorsSpeeds.leftSpeed = constrain(motorsSpeeds.leftSpeed, -MOTORS_MAX_PWM_VALUE, MOTORS_MAX_PWM_VALUE);
-//   motorsSpeeds.rightSpeed = constrain(motorsSpeeds.rightSpeed, -MOTORS_MAX_PWM_VALUE, MOTORS_MAX_PWM_VALUE);
-
-//   return motorsSpeeds;
-// }
-
 void printMotorsSpeeds(MotorsSpeeds motorSpeeds) {
   //print the motor speeds to the serial monitor
-  Serial.println("");
-  Serial.print("L = ");
+  Serial.print("Calc L = ");
   Serial.print(motorSpeeds.leftSpeed);
-
   Serial.print(" | R = ");
   Serial.println(motorSpeeds.rightSpeed);
 }
@@ -345,35 +328,80 @@ void printMotorsSpeeds(MotorsSpeeds motorSpeeds) {
 void applySpeedsToMotors(MotorsSpeeds motorSpeeds) {
   //apply the motor speeds to the motors
 
+  static int actualLeftPWMSpeed = 0;
+  static int actualRightPWMSpeed = 0;
+  static int actualLeftDirection = 0;
+  static int actualRightDirection = 0;
+
+  int desiredLeftSpeed = abs(motorSpeeds.leftSpeed);
+  int desiredRightSpeed = abs(motorSpeeds.rightSpeed);
+  int desiredLeftDirection = motorSpeeds.leftSpeed > 0 ? 1 : motorSpeeds.leftSpeed < 0 ? -1 : 0; // load direction of the motors (forward or zero or backward)
+  int desiredRightDirection = motorSpeeds.rightSpeed > 0 ? 1 : motorSpeeds.rightSpeed < 0 ? -1 : 0;
+
+  if(DEBUG == 1){
+    //print the desired speeds and directions
+    Serial.print("Desired L = ");
+    Serial.print(desiredLeftSpeed);
+    Serial.print(" | R = ");
+    Serial.println(desiredRightSpeed);
+    Serial.print("Dir L = ");
+    Serial.print(desiredLeftDirection);
+    Serial.print(" | R = ");
+    Serial.println(desiredRightDirection);
+
+    //print the actual speeds and directions
+    Serial.print("Actual L = ");
+    Serial.print(actualLeftPWMSpeed);
+    Serial.print(" | R = ");
+    Serial.println(actualRightPWMSpeed);
+    Serial.print("Dir L = ");
+    Serial.print(actualLeftDirection);
+    Serial.print(" | R = ");
+    Serial.println(actualRightDirection);
+  }
+  
+
+  // Adjust softly the speed of the motors
+  if (desiredRightSpeed > actualRightPWMSpeed) {
+    actualRightPWMSpeed += SPEED_INCREMENT_SOFT;
+  } else if (desiredRightSpeed < actualRightPWMSpeed) {
+    actualRightPWMSpeed += SPEED_INCREMENT_SOFT;
+  }
+
+  if (desiredLeftSpeed > actualLeftPWMSpeed) {
+    actualLeftPWMSpeed += SPEED_INCREMENT_SOFT;
+  } else if (desiredLeftSpeed < actualLeftPWMSpeed) {
+    actualLeftPWMSpeed += SPEED_INCREMENT_SOFT;
+  }
+  
   // Motor izquierdo
-  if (motorSpeeds.leftSpeed > 0) {
+  if (actualLeftDirection > 0) {
     digitalWrite(PIN_MOTOR_L_1, HIGH);
     digitalWrite(PIN_MOTOR_L_2, LOW);
-    analogWrite(PIN_MOTOR_L_PWM, motorSpeeds.leftSpeed);
-  } else if (motorSpeeds.leftSpeed < 0) {
+  } else if (actualLeftDirection < 0) {
     digitalWrite(PIN_MOTOR_L_1, LOW);
     digitalWrite(PIN_MOTOR_L_2, HIGH);
-    analogWrite(PIN_MOTOR_L_PWM, -motorSpeeds.leftSpeed);//multiplica por -1 porque el valor es negativo
   } else {
     digitalWrite(PIN_MOTOR_L_1, LOW);
     digitalWrite(PIN_MOTOR_L_2, LOW);
-    analogWrite(PIN_MOTOR_L_PWM, 0);
   }
 
   // Motor derecho
-  if (motorSpeeds.rightSpeed > 0) {
+  if (actualRightDirection > 0) {
     digitalWrite(PIN_MOTOR_R_1, LOW);
     digitalWrite(PIN_MOTOR_R_2, HIGH);
-    analogWrite(PIN_MOTOR_R_PWM, motorSpeeds.rightSpeed);
-  } else if (motorSpeeds.rightSpeed < 0) {
+  } else if (actualRightDirection < 0) {
     digitalWrite(PIN_MOTOR_R_1, HIGH);
     digitalWrite(PIN_MOTOR_R_2, LOW);
-    analogWrite(PIN_MOTOR_R_PWM, -motorSpeeds.rightSpeed); 
   } else {
     digitalWrite(PIN_MOTOR_R_1, LOW);
     digitalWrite(PIN_MOTOR_R_2, LOW);
-    analogWrite(PIN_MOTOR_R_PWM, 0);
   }
+
+  // Set the PWM values
+  analogWrite(PIN_MOTOR_L_PWM, actualLeftPWMSpeed);
+  analogWrite(PIN_MOTOR_R_PWM, actualRightPWMSpeed);
+
 }
 
 events handle_button()
