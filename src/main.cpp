@@ -4,7 +4,8 @@
 #define DEBUG 1
 
 //PIN DEFINITIONS
-const int PIN_LED = LED_BUILTIN;           //D8 | Digital 8 | GPIO 14
+// const int PIN_LED = 8;           //D8 | Digital 8 | GPIO 14
+const int PIN_LED = 8;           //D8 | Digital 8 | GPIO 14
 const int PIN_BUTTON = 9;        //D9 | Digital 9 | GPIO 15 --???????? TODO: Revisar todos los pines
 
 //MOTOR RIGHT
@@ -19,12 +20,12 @@ const int PIN_MOTOR_L_2 = 4;      //D4 | Digital 4 | GPIO 6
 
 //SENSOR PINS
 const int PIN_SENSOR_0 = 11;
-const int PIN_SENSOR_1 = 14;
-const int PIN_SENSOR_2 = 15;
-const int PIN_SENSOR_3 = 16;
-const int PIN_SENSOR_4 = 17;
-const int PIN_SENSOR_5 = 18;
-const int PIN_SENSOR_6 = 19;
+const int PIN_SENSOR_1 = A5;
+const int PIN_SENSOR_2 = A4;
+const int PIN_SENSOR_3 = A3;
+const int PIN_SENSOR_4 = A2;
+const int PIN_SENSOR_5 = A1;
+const int PIN_SENSOR_6 = A0;
 const int PIN_SENSOR_7 = 12;
 
 const int CANT_ANALOG_SENSORS = 6;
@@ -40,16 +41,16 @@ const int PINS_DIGITAL_SENSORS[CANT_DIGITAL_SENSORS] = {PIN_SENSOR_0, PIN_SENSOR
 //GLOBAL CONSTANTS
 #define ANALOG_SENSOR_THRESHOLD   1024
 #define ANALOG_SENSOR_MAX         1024
-#define MOTORS_MAX_PWM_VALUE      1024
+#define MOTORS_MAX_PWM_VALUE      255
 
 #define DELAY_MS_MAIN_LOOP  100
 
-#define CANT_LONGPRESS_LEN    600 / DELAY_MS_MAIN_LOOP  // 2.5 seconds
+#define CANT_LONGPRESS_LEN    600 / DELAY_MS_MAIN_LOOP  // 0.6 seconds
 #define CANT_SHORTPRESS_LEN   100 / DELAY_MS_MAIN_LOOP   // 0.1 seconds
 // #define CANT_WAIT_TO_ACTION_LEN   200 / DELAY_MS_MAIN_LOOP   // 0.2 seconds
 
-#define SPEED_BASE      50
-#define SPEED_INCREMENT      30
+#define SPEED_BASE      200
+#define SPEED_INCREMENT      10
 
 
 
@@ -169,6 +170,12 @@ void setup() {
 
   //print the message to the serial monitor
   Serial.println("INITIALIZATION COMPLETED");
+  applySpeedsToMotors({0,0});
+  Serial.println("MOTORES STOPPED");
+  delay(1000);
+  Serial.println("MOTORES START");
+  applySpeedsToMotors({255,255});
+
 
   currentState = STATE_STOP;
 }
@@ -196,6 +203,8 @@ void loop() {
       if (event == EV_SHORTPRESS) {
         currentState = STATE_RUNNING;
       } 
+      // applySpeedsToMotors({0,0});
+
       break;
     }
     
@@ -221,9 +230,9 @@ void loop() {
 
       applySpeedsToMotors(motorsSpeeds);
 
-      // if(DEBUG){
-      //   Serial.println("==============================================================");
-      // }
+      if(DEBUG){
+        Serial.println("==============================================================");
+      }
 
       break;
     }
@@ -274,34 +283,48 @@ void printSensorsValues(SensorsData sensorData) {
 
   Serial.print("DV: ");
   for (int i = 0; i < 8; i++) {
-    Serial.print(sensorData.digitalSensorValues[i] == 1 ? "[" + String(i) + "]" : " ___");
+    Serial.print(sensorData.digitalSensorValues[i] == 1 ? " [" + String(i) + "]" : " ___");
   }
 }
 
 MotorsSpeeds calculateMotorsSpeeds(SensorsData sensorData) {
 
-  MotorsSpeeds motorsSpeeds; 
+  printSensorsValues(sensorData);
+
+  MotorsSpeeds motorsSpeeds = MotorsSpeeds(); 
   int weights[] = {5, 3, 2, 1, 1, 2, 3, 5};
   
   int maxRightDetections = 0;
-  for (int i = CANT_DIGITAL_SENSORS / 2 - 1; i < CANT_DIGITAL_SENSORS; i++) {
-    if (sensorData.digitalSensorValues[i] * weights[i] > maxRightDetections)
+  for (int i = CANT_ALL_SENSORS / 2; i < CANT_ALL_SENSORS; i++) {
+    if (sensorData.digitalSensorValues[i] * weights[i] > maxRightDetections){
       maxRightDetections = sensorData.digitalSensorValues[i] * weights[i];
+    }
   }
 
   int maxLeftDetections = 0;
-  for (int i = 0; i < CANT_DIGITAL_SENSORS / 2; i++) {
-    if (sensorData.digitalSensorValues[i] * weights[i] > maxLeftDetections)
-      maxLeftDetections = sensorData.digitalSensorValues[i] * weights[i];
+  for (int i = 0; i < CANT_ALL_SENSORS / 2; i++) {
+    if (sensorData.digitalSensorValues[i] == 1){
+      if (sensorData.digitalSensorValues[i] * weights[i] > maxLeftDetections)
+      {
+        maxLeftDetections = sensorData.digitalSensorValues[i] * weights[i];
+      }
+    }
+    
   }
   
+  Serial.println(); 
+  Serial.print("MR: "); 
+  Serial.print(maxRightDetections);
+  Serial.print(" | ML: ");
+  Serial.println(maxLeftDetections);
+
   //El output va a ir tomando valores positivos y negativos 
   motorsSpeeds.leftSpeed = SPEED_BASE + SPEED_INCREMENT * maxRightDetections; // Motor izquierdo + Error derecho
   motorsSpeeds.rightSpeed = SPEED_BASE + SPEED_INCREMENT * maxLeftDetections; // Motor derecho + Error izquierdo
 
   // Asegurarse de que las velocidades no excedan los límites
-  motorsSpeeds.leftSpeed = constrain(motorsSpeeds.leftSpeed, -MOTORS_MAX_PWM_VALUE, MOTORS_MAX_PWM_VALUE);
-  motorsSpeeds.rightSpeed = constrain(motorsSpeeds.rightSpeed, -MOTORS_MAX_PWM_VALUE, MOTORS_MAX_PWM_VALUE);
+  // motorsSpeeds.leftSpeed = constrain(motorsSpeeds.leftSpeed, 0, MOTORS_MAX_PWM_VALUE);
+  // motorsSpeeds.rightSpeed = constrain(motorsSpeeds.rightSpeed, 0, MOTORS_MAX_PWM_VALUE);
 
   return motorsSpeeds;
 }
@@ -333,8 +356,40 @@ MotorsSpeeds calculateMotorsSpeeds(SensorsData sensorData) {
 // }
 
 void printMotorsSpeeds(MotorsSpeeds motorSpeeds) {
+
+int s0 = digitalRead(ir0);  // Left Most Sensor
+  int s1 = digitalRead(ir1);  // Left Sensor
+  int s2 = digitalRead(ir2);  // Left Center Sensor
+  int s3 = digitalRead(ir3);  // Center Left Sensor
+  int s4 = digitalRead(ir4);  // Center Right Sensor
+  int s5 = digitalRead(ir5);  // Right Center Sensor
+  int s6 = digitalRead(ir6);  // Right Sensor
+  int s7 = digitalRead(ir7);  // Right Most Sensor
+
+  //print all values
+  //print all sensor values
+  Serial.print("Sensors: ");
+  Serial.print(s0);
+  Serial.print(" ");
+  Serial.print(s1);
+  Serial.print(" ");
+  Serial.print(s2);
+  Serial.print(" ");
+  Serial.print(s3);
+  Serial.print(" ");
+  Serial.print(s4);
+  Serial.print(" ");
+  Serial.print(s5);
+  Serial.print(" ");
+  Serial.print(s6);
+  Serial.print(" ");
+  Serial.println(s7);
+
+
+
+
+
   //print the motor speeds to the serial monitor
-  Serial.println("");
   Serial.print("L = ");
   Serial.print(motorSpeeds.leftSpeed);
 
@@ -350,11 +405,13 @@ void applySpeedsToMotors(MotorsSpeeds motorSpeeds) {
     digitalWrite(PIN_MOTOR_L_1, HIGH);
     digitalWrite(PIN_MOTOR_L_2, LOW);
     analogWrite(PIN_MOTOR_L_PWM, motorSpeeds.leftSpeed);
-  } else if (motorSpeeds.leftSpeed < 0) {
-    digitalWrite(PIN_MOTOR_L_1, LOW);
-    digitalWrite(PIN_MOTOR_L_2, HIGH);
-    analogWrite(PIN_MOTOR_L_PWM, -motorSpeeds.leftSpeed);//multiplica por -1 porque el valor es negativo
-  } else {
+  } 
+  // else if (motorSpeeds.leftSpeed < 0) {
+  //   digitalWrite(PIN_MOTOR_L_1, LOW);
+  //   digitalWrite(PIN_MOTOR_L_2, HIGH);
+  //   analogWrite(PIN_MOTOR_L_PWM, -motorSpeeds.leftSpeed);//multiplica por -1 porque el valor es negativo
+  // } 
+  else {
     digitalWrite(PIN_MOTOR_L_1, LOW);
     digitalWrite(PIN_MOTOR_L_2, LOW);
     analogWrite(PIN_MOTOR_L_PWM, 0);
@@ -365,11 +422,13 @@ void applySpeedsToMotors(MotorsSpeeds motorSpeeds) {
     digitalWrite(PIN_MOTOR_R_1, LOW);
     digitalWrite(PIN_MOTOR_R_2, HIGH);
     analogWrite(PIN_MOTOR_R_PWM, motorSpeeds.rightSpeed);
-  } else if (motorSpeeds.rightSpeed < 0) {
-    digitalWrite(PIN_MOTOR_R_1, HIGH);
-    digitalWrite(PIN_MOTOR_R_2, LOW);
-    analogWrite(PIN_MOTOR_R_PWM, -motorSpeeds.rightSpeed); 
-  } else {
+  } 
+  // else if (motorSpeeds.rightSpeed < 0) {
+  //   digitalWrite(PIN_MOTOR_R_1, HIGH);
+  //   digitalWrite(PIN_MOTOR_R_2, LOW);
+  //   analogWrite(PIN_MOTOR_R_PWM, -motorSpeeds.rightSpeed); 
+  // } 
+  else {
     digitalWrite(PIN_MOTOR_R_1, LOW);
     digitalWrite(PIN_MOTOR_R_2, LOW);
     analogWrite(PIN_MOTOR_R_PWM, 0);
