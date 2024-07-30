@@ -199,6 +199,12 @@ void loop() {
     Serial.println(currentState);
   }
 
+  if(DEBUG == 2){ 
+    Serial.println(event);
+    Serial.println(digitalRead(PIN_BUTTON));
+    Serial.println(currentState);
+  }
+
   switch (currentState) {
 
     case STATE_STOP:
@@ -224,6 +230,9 @@ void loop() {
       if(DEBUG == 1) {
         printSensorsValues(sensorData);
       } 
+      if(DEBUG == 2){ 
+        printSensorsValues(sensorData);
+      }
     
       MotorsSpeeds motorsSpeeds = calculateMotorsSpeeds(sensorData);
 
@@ -275,18 +284,29 @@ SensorsData readSensorsValues() {
 
 void printSensorsValues(SensorsData sensorData) {
   //print the values of the sensors to the serial monitor
-  Serial.print("AV: ");
-  for (int i = 0; i < 6; i++) {
-    Serial.print(sensorData.analogSensorValues[i]);
-    Serial.print(" : ");
-  }
-  Serial.println("");
+  if(DEBUG==1) {
+    Serial.print("AV: ");
+    for (int i = 0; i < 6; i++) {
+      Serial.print(sensorData.analogSensorValues[i]);
+      Serial.print(" : ");
+    }
+    Serial.println("");
 
-  Serial.print("DV: ");
-  for (int i = 0; i < 8; i++) {
-    Serial.print(sensorData.digitalSensorValues[i] == VALUE_LINE ? " [" + String(i + 1) + "]" : " ___");
+    Serial.print("DV: ");
+    for (int i = 0; i < 8; i++) {
+      Serial.print(sensorData.digitalSensorValues[i] == VALUE_LINE ? " [" + String(i + 1) + "]" : " ___");
+    }
+    Serial.println("");
   }
-  Serial.println("");
+  if(DEBUG==2){
+    for (int i = 0; i < 6; i++) {
+      Serial.println(sensorData.analogSensorValues[i]);
+    }
+    for (int i = 0; i < 8; i++) {
+      Serial.println(sensorData.digitalSensorValues[i] == VALUE_LINE ? "1" : "0");
+    }
+  }
+  
 
 }
 
@@ -312,30 +332,48 @@ MotorsSpeeds calculateMotorsSpeeds(SensorsData sensorData) {
   //El output va a ir tomando valores positivos y negativos 
   motorsSpeeds.leftSpeed = SPEED_BASE + SPEED_INCREMENT * maxRightDetections; // Motor izquierdo + Error derecho
   motorsSpeeds.rightSpeed = SPEED_BASE + SPEED_INCREMENT * maxLeftDetections; // Motor derecho + Error izquierdo
-
-  Serial.print("NCons L = ");
-  Serial.print(motorsSpeeds.leftSpeed);
-  Serial.print(" | R = ");
-  Serial.println(motorsSpeeds.rightSpeed);
+  if (DEBUG == 1){
+    Serial.print("NCons L = ");
+    Serial.print(motorsSpeeds.leftSpeed);
+    Serial.print(" | R = ");
+    Serial.println(motorsSpeeds.rightSpeed);
+  }
+  if (DEBUG == 2){
+    Serial.println(motorsSpeeds.leftSpeed);
+    Serial.println(motorsSpeeds.rightSpeed);
+  }
 
   // Asegurarse de que las velocidades no excedan los límites
   motorsSpeeds.leftSpeed = constrain(motorsSpeeds.leftSpeed, 0, MOTORS_MAX_PWM_VALUE);
   motorsSpeeds.rightSpeed = constrain(motorsSpeeds.rightSpeed, 0, MOTORS_MAX_PWM_VALUE);
 
-  Serial.print("WCons L = ");
-  Serial.print(motorsSpeeds.leftSpeed);
-  Serial.print(" | R = ");
-  Serial.println(motorsSpeeds.rightSpeed);
+  if (DEBUG == 1){
+    Serial.print("WCons L = ");
+    Serial.print(motorsSpeeds.leftSpeed);
+    Serial.print(" | R = ");
+    Serial.println(motorsSpeeds.rightSpeed);
+  }
+  if (DEBUG == 2){
+    Serial.println(motorsSpeeds.leftSpeed);
+    Serial.println(motorsSpeeds.rightSpeed);
+  }
+
 
   return motorsSpeeds;
 }
 
 void printMotorsSpeeds(MotorsSpeeds motorSpeeds) {
   //print the motor speeds to the serial monitor
-  Serial.print("Calc L = ");
-  Serial.print(motorSpeeds.leftSpeed);
-  Serial.print(" | R = ");
-  Serial.println(motorSpeeds.rightSpeed);
+  if (DEBUG == 1){
+    Serial.print("Calc L = ");
+    Serial.print(motorSpeeds.leftSpeed);
+    Serial.print(" | R = ");
+    Serial.println(motorSpeeds.rightSpeed);
+  }
+  if (DEBUG == 2){
+    Serial.println(motorSpeeds.leftSpeed);
+    Serial.println(motorSpeeds.rightSpeed);
+  }
 }
 
 void applySpeedsToMotors(MotorsSpeeds motorSpeeds) {
@@ -373,6 +411,16 @@ void applySpeedsToMotors(MotorsSpeeds motorSpeeds) {
     // Serial.print(actualLeftDirection);
     // Serial.print(" | R = ");
     // Serial.println(actualRightDirection);
+  }
+  if (DEBUG == 2){
+    Serial.println(desiredLeftSpeed);
+    Serial.println(desiredRightSpeed);
+    Serial.println(desiredLeftDirection);
+    Serial.println(desiredRightDirection);
+    Serial.println(actualLeftPWMSpeed);
+    Serial.println(actualRightPWMSpeed);
+    Serial.println(actualLeftDirection);
+    Serial.println(actualRightDirection);
   }
   
 
