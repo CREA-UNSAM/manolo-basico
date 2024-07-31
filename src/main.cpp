@@ -15,8 +15,8 @@ const int PIN_MOTOR_R_2 = 7;     //D7 | Digital 7 | GPIO 13
 
 //MOTOR LEFT
 const int PIN_MOTOR_L_PWM = 3;    //D3 | Digital 3 | GPIO 5
-const int PIN_MOTOR_L_1 = 2;      //D2 | Digital 2 | GPIO 4
-const int PIN_MOTOR_L_2 = 4;      //D4 | Digital 4 | GPIO 6
+const int PIN_MOTOR_L_1 = 4;      //D2 | Digital 2 | GPIO 4
+const int PIN_MOTOR_L_2 = 2;      //D4 | Digital 4 | GPIO 6
 
 //SENSOR PINS
 const int PIN_SENSOR_0 = 11;
@@ -423,11 +423,11 @@ void applySpeedsToMotors(MotorsSpeeds motorSpeeds) {
     Serial.println(actualRightDirection);
   }
   
-
   // Adjust softly the speed of the motors until 0 or 255
   if (actualLeftPWMSpeed >= 0 && actualLeftPWMSpeed <= MOTORS_MAX_PWM_VALUE){    
+    int diff = abs(desiredLeftDirection - actualLeftPWMSpeed);
     if (desiredLeftSpeed > actualLeftPWMSpeed) {
-      actualLeftPWMSpeed += SPEED_INCREMENT_SOFT;
+      actualLeftPWMSpeed +=  min(SPEED_INCREMENT_SOFT, diff);
     } else if (desiredLeftSpeed < actualLeftPWMSpeed) {
       actualLeftPWMSpeed -= SPEED_INCREMENT_SOFT;
     }
